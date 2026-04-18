@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: xhs-tool
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: DASHSCOPE_API_KEY
+        sync: false

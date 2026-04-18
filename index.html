@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>小红书图文排版工具 v7</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: #fafafa; color: #222; }
+  .app { display: grid; grid-template-columns: 440px 1fr; min-height: 100vh; }
+
+  /* 左侧控制面板 */
+  .panel { background: #fff; border-right: 1px solid #eee; padding: 24px; overflow-y: auto; max-height: 100vh; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .brand .logo { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg,#ff2e4d,#ff6f91); display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px; }
+  .brand .title { font-size: 18px; font-weight: 700; }
+  .brand .sub { font-size: 12px; color: #888; margin-top: 2px; }
+
+  .section { margin-bottom: 20px; }
+  .section h3 { font-size: 13px; color: #666; margin-bottom: 8px; font-weight: 600; letter-spacing: 0.5px; }
+  label { display: block; font-size: 13px; color: #444; margin: 8px 0 4px; }
+  input, textarea, select {
+    width: 100%; padding: 10px 12px; border: 1px solid #e5e5e5; border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: #fff; outline: none; transition: border .15s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: #ff2e4d; }
+  textarea { resize: vertical; min-height: 70px; }
+
+  /* AI 魔法区块 - 突出样式 */
+  .magic-box {
+    background: linear-gradient(135deg, #fff5f6 0%, #fef3e7 100%);
+    border: 1px solid #ffd4dc; border-radius: 12px; padding: 16px;
+    margin-bottom: 20px; position: relative;
+  }
+  .magic-box h3 { color: #d63856; font-size: 14px; margin-bottom: 10px; display:flex; align-items:center; gap:6px; }
+  .magic-box .magic-hint { font-size: 12px; color: #a36a76; margin-top: 6px; }
+  .magic-box .btn { margin-top: 10px; }
+
+  /* 场景快捷标签 */
+  .scene-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .scene-chip {
+    padding: 4px 10px; border-radius: 12px; font-size: 12px; background: #fff;
+    border: 1px solid #ffd4dc; color: #d63856; cursor: pointer; transition: all .15s;
+  }
+  .scene-chip:hover { background: #ffe6ea; }
+
+  /* 候选方案卡片 */
+  .candidates { margin-top: 12px; display: none; }
+  .candidates.show { display: block; }
+  .candidate {
+    background: #fff; border: 1px solid #ffd4dc; border-radius: 8px; padding: 10px 12px;
+    margin-bottom: 8px; cursor: pointer; transition: all .15s;
+  }
+  .candidate:hover { border-color: #ff2e4d; box-shadow: 0 2px 8px rgba(255,46,77,0.1); }
+  .candidate .c-title { font-size: 14px; font-weight: 700; color: #222; margin-bottom: 4px; }
+  .candidate .c-sub { font-size: 12px; color: #888; }
+  .candidate .c-use { font-size: 11px; color: #d63856; margin-top: 6px; font-weight:600; }
+
+  /* 模板选择 */
+  .templates { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tpl {
+    padding: 10px 6px; border: 1px solid #e5e5e5; border-radius: 8px; cursor: pointer;
+    text-align: center; font-size: 12px; transition: all .15s; background: #fff;
+  }
+  .tpl:hover { border-color: #ff2e4d; }
+  .tpl.active { border-color: #ff2e4d; background: #fff5f6; color: #ff2e4d; font-weight: 600; }
+  .tpl .icon { font-size: 20px; margin-bottom: 4px; display: block; }
+
+  /* 配色 */
+  .colors { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color {
+    width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent;
+    transition: transform .15s;
+  }
+  .color:hover { transform: scale(1.1); }
+  .color.active { border-color: #222; }
+
+  /* 按钮 */
+  .btn {
+    width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer;
+    font-size: 14px; font-weight: 600; transition: all .15s;
+  }
+  .btn-primary { background: #ff2e4d; color: #fff; }
+  .btn-primary:hover { background: #e02a45; }
+  .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+  .btn-secondary { background: #f5f5f5; color: #333; margin-top: 8px; }
+  .btn-secondary:hover { background: #eee; }
+  .btn-magic { background: linear-gradient(135deg,#ff2e4d,#ff6f91); color:#fff; }
+  .btn-magic:hover { opacity: 0.9; }
+
+  /* 右侧预览 */
+  .preview { padding: 40px; display: flex; flex-direction: column; align-items: center; overflow-y: auto; max-height: 100vh; }
+  .preview-title { font-size: 14px; color: #888; margin-bottom: 16px; }
+
+  /* 卡片容器 - 小红书 3:4 比例 */
+  .card-wrap { position: relative; }
+  .card {
+    width: 450px; height: 600px; background: #fff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.08); position: relative;
+  }
+
+  /* 模板样式 */
+  .card.tpl-cover { display: flex; flex-direction: column; }
+  .card.tpl-cover .bg { flex: 1; background-size: cover; background-position: center; position: relative; }
+  .card.tpl-cover .bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55)); }
+  .card.tpl-cover .text-area { position: absolute; bottom: 0; left: 0; right: 0; padding: 24px; color: #fff; z-index: 2; }
+  .card.tpl-cover .title { font-size: 32px; font-weight: 800; line-height: 1.2; margin-bottom: 8px; text-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .card.tpl-cover .subtitle { font-size: 14px; opacity: 0.9; }
+
+  .card.tpl-bigword { display: flex; flex-direction: column; padding: 40px 30px; }
+  .card.tpl-bigword .title { font-size: 48px; font-weight: 900; line-height: 1.15; margin-bottom: 20px; }
+  .card.tpl-bigword .highlight { background: var(--accent, #ffe66d); padding: 0 8px; display: inline-block; }
+  .card.tpl-bigword .content { font-size: 18px; line-height: 1.6; color: #555; }
+  .card.tpl-bigword .img { margin-top: auto; width: 100%; height: 240px; border-radius: 12px; background-size: cover; background-position: center; }
+
+  .card.tpl-split { display: flex; flex-direction: column; }
+  .card.tpl-split .img { width: 100%; height: 50%; background-size: cover; background-position: center; }
+  .card.tpl-split .text-area { flex: 1; padding: 24px; display: flex; flex-direction: column; justify-content: center; }
+  .card.tpl-split .title { font-size: 28px; font-weight: 800; margin-bottom: 12px; line-height: 1.25; }
+  .card.tpl-split .content { font-size: 15px; line-height: 1.7; color: #666; }
+
+  .card.tpl-polaroid { display: flex; flex-direction: column; padding: 30px; background: #fef8f0; }
+  .card.tpl-polaroid .img { width: 100%; height: 380px; background-size: cover; background-position: center; background-color: #eee; box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+  .card.tpl-polaroid .title { font-size: 26px; font-weight: 700; margin-top: 20px; font-family: Georgia, serif; }
+  .card.tpl-polaroid .content { font-size: 14px; color: #888; margin-top: 8px; }
+
+  .card.tpl-tag { padding: 36px 28px; display: flex; flex-direction: column; }
+  .card.tpl-tag .pre-title { font-size: 14px; font-weight: 600; padding: 4px 12px; border-radius: 4px; background: var(--accent, #ffe66d); display: inline-block; width: fit-content; margin-bottom: 16px; }
+  .card.tpl-tag .title { font-size: 40px; font-weight: 900; line-height: 1.15; margin-bottom: 16px; }
+  .card.tpl-tag .desc { font-size: 15px; color: #666; line-height: 1.7; margin-bottom: 20px; }
+  .card.tpl-tag .img { width: 100%; flex: 1; border-radius: 8px; background-size: cover; background-position: center; min-height: 200px; }
+
+  .card.tpl-list { padding: 40px 30px; display: flex; flex-direction: column; }
+  .card.tpl-list .title { font-size: 32px; font-weight: 900; margin-bottom: 24px; line-height: 1.2; }
+  .card.tpl-list .items { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+  .card.tpl-list .item { display: flex; gap: 12px; align-items: flex-start; }
+  .card.tpl-list .num { width: 28px; height: 28px; border-radius: 50%; background: var(--accent, #ffe66d); color: #222; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; }
+  .card.tpl-list .item-text { font-size: 16px; line-height: 1.5; }
+
+  /* 图片加载 loading */
+  .img.loading, .bg.loading { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+  /* 标签行 */
+  .tags-display { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; max-width: 450px; }
+  .tag-item { font-size: 12px; color: #2b5f8f; background: #f0f7ff; padding: 4px 10px; border-radius: 4px; }
+
+  .hint { color: #aaa; font-size: 12px; margin-top: 6px; }
+  .status { padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; display: none; }
+  .status.show { display: block; }
+  .status.ok { background: #ecfdf5; color: #047857; }
+  .status.err { background: #fef2f2; color: #b91c1c; }
+
+  .collapse-head { display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; }
+  .collapse-head::after { content: '▾'; font-size: 12px; color: #888; transition: transform .2s; }
+  .collapse-head.collapsed::after { transform: rotate(-90deg); }
+  .collapse-body.hide { display:none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 左侧控制面板 -->
+  <aside class="panel">
+    <div class="brand">
+      <div class="logo">小</div>
+      <div>
+        <div class="title">小红书图文排版工具</div>
+        <div class="sub">一句话生成 · 通义万相配图 · 一键导出 · v7</div>
+      </div>
+    </div>
+
+    <!-- ✨ 核心：一句话生成笔记 -->
+    <div class="magic-box">
+      <h3>✨ 一句话生成笔记（AI 智能文案）</h3>
+      <label style="color:#666;">输入一个模糊的主题，自动生成主标题+副标题+正文+配图描述</label>
+      <textarea id="m-topic" placeholder="例：周末早餐 / 通勤穿搭 / 咖啡店探店 / 健身塑形..." rows="2">周末早餐</textarea>
+
+      <div class="scene-chips" id="scene-chips">
+        <span class="scene-chip" data-topic="周末早餐">🥐 周末早餐</span>
+        <span class="scene-chip" data-topic="通勤穿搭">👗 通勤穿搭</span>
+        <span class="scene-chip" data-topic="咖啡店探店">☕ 咖啡探店</span>
+        <span class="scene-chip" data-topic="居家好物推荐">🛋️ 居家好物</span>
+        <span class="scene-chip" data-topic="减脂餐">🥗 减脂餐</span>
+        <span class="scene-chip" data-topic="旅行vlog">✈️ 旅行vlog</span>
+        <span class="scene-chip" data-topic="护肤干货">💧 护肤干货</span>
+        <span class="scene-chip" data-topic="读书笔记">📖 读书笔记</span>
+      </div>
+
+      <button class="btn btn-magic" id="gen-copy-btn">✨ 生成 7 套爆款文案（含 AI）</button>
+      <div class="magic-hint">🎯 100+ 爆款句式｜10 大领域适配｜含 emoji + 摄影级配图 prompt + AI 智能创作 2 套</div>
+
+      <div class="candidates" id="candidates"></div>
+    </div>
+
+    <div class="section">
+      <h3>📐 选择模板</h3>
+      <div class="templates" id="tpl-grid">
+        <div class="tpl active" data-tpl="cover"><span class="icon">🎬</span>沉浸封面</div>
+        <div class="tpl" data-tpl="bigword"><span class="icon">💥</span>大字报</div>
+        <div class="tpl" data-tpl="split"><span class="icon">🖼️</span>上下分栏</div>
+        <div class="tpl" data-tpl="polaroid"><span class="icon">📷</span>拍立得</div>
+        <div class="tpl" data-tpl="tag"><span class="icon">🏷️</span>标签卡</div>
+        <div class="tpl" data-tpl="list"><span class="icon">📋</span>清单体</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3 class="collapse-head" data-target="copy-body">✍️ 文案内容（可手动微调）</h3>
+      <div class="collapse-body" id="copy-body">
+        <label>主标题</label>
+        <input id="f-title" value="周末在家就能做的 5 分钟早餐" maxlength="30" />
+        <label>副标题 / 正文</label>
+        <textarea id="f-content">简单 · 快手 · 低卡
+零厨艺也能搞定～</textarea>
+        <label>前缀小标签（可选）</label>
+        <input id="f-pretitle" value="生活分享" maxlength="10" />
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>🎨 主题配色</h3>
+      <div class="colors" id="color-picker">
+        <div class="color active" style="background:#ffe66d" data-color="#ffe66d"></div>
+        <div class="color" style="background:#ff6b9d" data-color="#ff6b9d"></div>
+        <div class="color" style="background:#a8d8ea" data-color="#a8d8ea"></div>
+        <div class="color" style="background:#c8e6c9" data-color="#c8e6c9"></div>
+        <div class="color" style="background:#ffb5a7" data-color="#ffb5a7"></div>
+        <div class="color" style="background:#222222" data-color="#222222"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>🤖 AI 配图</h3>
+      <label>图片描述（会自动加小红书风格前缀）</label>
+      <textarea id="f-prompt" placeholder="例：一盘精致的水果燕麦早餐，浅色木桌">一盘精致的水果燕麦早餐，浅色木桌，晨光柔和</textarea>
+      <label style="margin-top:8px;">🎨 图片风格</label>
+      <div id="style-selector" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">
+        <button class="style-btn active" data-style="<photography>" style="padding:6px 12px;font-size:12px;border:2px solid #333;border-radius:20px;background:#fff;cursor:pointer;">📷 摄影风</button>
+        <button class="style-btn" data-style="<3d cartoon>" style="padding:6px 12px;font-size:12px;border:2px solid #ddd;border-radius:20px;background:#fff;cursor:pointer;">🎨 3D卡通</button>
+        <button class="style-btn" data-style="<anime>" style="padding:6px 12px;font-size:12px;border:2px solid #ddd;border-radius:20px;background:#fff;cursor:pointer;">✨ 动画风</button>
+        <button class="style-btn" data-style="<oil painting>" style="padding:6px 12px;font-size:12px;border:2px solid #ddd;border-radius:20px;background:#fff;cursor:pointer;">🖼️ 油画</button>
+        <button class="style-btn" data-style="<watercolor>" style="padding:6px 12px;font-size:12px;border:2px solid #ddd;border-radius:20px;background:#fff;cursor:pointer;">🎨 水彩</button>
+        <button class="style-btn" data-style="<sketch>" style="padding:6px 12px;font-size:12px;border:2px solid #ddd;border-radius:20px;background:#fff;cursor:pointer;">✏️ 素描</button>
+        <button class="style-btn" data-style="<chinese painting>" style="padding:6px 12px;font-size:12px;border:2px solid #ddd;border-radius:20px;background:#fff;cursor:pointer;">🏯 国画</button>
+        <button class="style-btn" data-style="<flat illustration>" style="padding:6px 12px;font-size:12px;border:2px solid #ddd;border-radius:20px;background:#fff;cursor:pointer;">📐 扁平插画</button>
+        <button class="style-btn" data-style="<portrait>" style="padding:6px 12px;font-size:12px;border:2px solid #ddd;border-radius:20px;background:#fff;cursor:pointer;">👤 人像写真</button>
+      </div>
+      <button class="btn btn-primary" id="gen-btn">🎨 AI 生成配图（通义万相）</button>
+      <button class="btn btn-secondary" id="cancel-btn" style="margin-top:6px;display:none;background:#fff0f0;color:#b91c1c;border:1px solid #fecaca;">⏹ 取消 / 清空当前任务</button>
+      <button class="btn btn-secondary" id="diag-btn" style="margin-top:6px;font-size:12px;padding:6px;">🔧 诊断后端连接</button>
+      <div class="hint">⏱ 通常 10-30 秒，遇限流会自动重试。有僵尸任务时点"取消"清空</div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="section">
+      <h3>🔖 笔记标签（复制用）</h3>
+      <textarea id="f-tags" rows="2">#早餐食谱 #快手早餐 #减脂餐 #生活记录</textarea>
+    </div>
+
+    <div class="section">
+      <button class="btn btn-primary" id="export-btn">📥 导出为 PNG 图片</button>
+      <button class="btn btn-secondary" id="copy-text-btn">📋 复制文案+标签</button>
+    </div>
+  </aside>
+
+  <!-- 右侧预览区 -->
+  <main class="preview">
+    <div class="preview-title">📱 实时预览（小红书 3:4 比例）</div>
+
+    <div class="card-wrap">
+      <div class="card tpl-cover" id="card"></div>
+    </div>
+
+    <div class="tags-display" id="tags-display"></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+  const state = {
+    template: 'cover',
+    color: '#ffe66d',
+    imageUrl: ''
+  };
+
+  const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+      <defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ffeaa7"/><stop offset="100%" stop-color="#ffb5a7"/>
+      </linearGradient></defs>
+      <rect width="800" height="600" fill="url(#g)"/>
+      <text x="400" y="300" font-family="sans-serif" font-size="36" fill="#fff" text-anchor="middle" opacity="0.7">点击 AI 生成配图</text>
+    </svg>
+  `);
+
+  /* ============================================================
+   * 小红书爆款文案生成引擎 v3（专业版）
+   * 10 大领域 · 30+ 标题公式 · 情感钩子 · emoji 智能插入
+   * ============================================================ */
+  const COPY_ENGINE = {
+    // 🎯 通用爆款标题公式（可适配任何主题）
+    titlePatterns: [
+      // 数字冲击型
+      t => `${randInt(3,9)}个${t}小技巧，我真的相见恨晚${emoji('fire')}`,
+      t => `试过 ${randInt(20,100)}+ ${t}后，我只推荐这 ${randInt(3,5)} 个`,
+      t => `${t} | 第 ${randInt(2,5)} 条真的绝了！`,
+      // 反差/悬念型
+      t => `不会吧？${t}居然可以这样${emoji('shock')}`,
+      t => `我才知道，${t}还能这么${randPick(['简单','省钱','出片','治愈'])}`,
+      t => `原来${t}的正确打开方式是这样的...`,
+      t => `关于${t}，我想给你一些"不一样"的建议`,
+      // 情绪钩子型
+      t => `${randPick(['救命！','绝了！','姐妹冲啊！','天呐！'])}这才是${t}的天花板`,
+      t => `${t}｜请允许我先夸一波自己${emoji('love')}`,
+      t => `挑战一周${t}后，我人都变好看了${emoji('sparkle')}`,
+      // 利益/人群型
+      t => `${t}保姆级教程｜看完直接抄作业不谢${emoji('book')}`,
+      t => `${randPick(['打工人','懒癌星人','学生党','新手小白','搞钱女孩'])}的${t}指南`,
+      t => `${randPick(['99%','80%','大多数人'])}都做错的${t}，这篇帮你避坑${emoji('warn')}`,
+      t => `${t}｜我的私藏清单全部公开`,
+      // 对比/清单型
+      t => `${t} ❤️ vs ❌ 大盘点｜避雷指南来了`,
+      t => `一篇搞定${t}｜${randInt(2000,5000)}字超全干货`,
+      t => `${t}｜${randPick(['新手','进阶','发烧友'])}必看版`,
+      t => `从入门到精通｜我的${t}完整攻略`,
+      // 种草型
+      t => `被种草 N 次的${t}｜实测后真的无脑入`,
+      t => `${t}｜我回购 ${randInt(3,10)} 次的真爱清单${emoji('love')}`,
+      // 体验型
+      t => `沉浸式${t}｜每一帧都在治愈${emoji('leaf')}`,
+      t => `周末来做${t}吧｜${randPick(['治愈','解压','快乐','充电'])}感拉满`,
+      // 日系/极简风
+      t => `关于${t}的一些小事`,
+      t => `${t}的日常 · ${randPick(['慢一点','认真生活','小确幸','自愈力'])}`
+    ],
+
+    // 🎯 正文模板（3-4行，符合小红书阅读节奏，含emoji）
+    subtitlePatterns: [
+      t => `${emoji('point')}简单上手 · 效果看得见\n${emoji('check')}亲测有效｜小白也能驾驭\n${emoji('heart')}收藏起来慢慢看～`,
+      t => `${emoji('sparkle')}不用花大钱也能出效果\n${emoji('check')}0 基础 · 懒人友好\n${emoji('fire')}最后一条 YYDS！`,
+      t => `省钱｜省时｜出效果\n这份${t}攻略请收好${emoji('bookmark')}\n边看边存 不会后悔`,
+      t => `从 ${randPick(['踩坑','纠结','瞎买'])}到总结出这份清单\n${t}这一篇就够了${emoji('book')}\n附带避雷指南${emoji('warn')}`,
+      t => `周末/下班 20 分钟搞定\n仪式感 ✖ 性价比 双在线${emoji('sparkle')}\n打工人的小确幸没有错！`,
+      t => `${emoji('heart')}细节拉满｜每一步都讲清楚\n${emoji('check')}博主亲测｜零失败率\n${emoji('fire')}跟着做就对了`,
+      t => `这份${t}清单我真的测了很久${emoji('time')}\n${emoji('check')}每一个都值回票价\n${emoji('heart')}希望对你有帮助`,
+      t => `${emoji('warn')}踩坑预警｜看完再入手\n${emoji('check')}真实使用感受\n${emoji('heart')}客观 · 详细 · 不水`
+    ],
+
+    // 前缀小标签（分类更精细）
+    preTitles: [
+      '生活分享', '干货合集', '新手必看', '保姆教程', '避雷指南',
+      '强烈安利', '博主私藏', '真实体验', '良心推荐', '宝藏发现',
+      '一键收藏', '超全干货', '懒人福利', '回购清单', '踩坑总结'
+    ],
+
+    // Emoji 智能池（按语境）
+    emojiMap: {
+      fire: ['🔥', '💥', '⚡️'],
+      heart: ['❤️', '💕', '💗', '🧡'],
+      love: ['🥰', '😍', '💖'],
+      shock: ['😱', '🤯', '😳'],
+      sparkle: ['✨', '🌟', '💫'],
+      check: ['✅', '✔️', '💯'],
+      bookmark: ['📌', '🔖'],
+      book: ['📖', '📚'],
+      warn: ['⚠️', '🚨'],
+      leaf: ['🌿', '🍃', '🌱'],
+      point: ['👉', '💡'],
+      time: ['⏰', '⏳']
+    },
+
+    // 🎨 摄影级配图 Prompt 库（混元效果）
+    imagePromptPatterns: {
+      '早餐|早饭|brunch|吐司|燕麦': '小红书爆款美食摄影，一份精致的{mood}早餐摆盘，浅色原木桌面，清晨柔和自然光从左侧窗户洒入，俯拍45度，奶油色调，ins风，高清细节，杂志质感，食材细节丰富（水果/牛奶/麦片），餐具精致',
+      '穿搭|OOTD|outfit|时尚|look': '时尚杂志级穿搭大片，{style}风格全身look，干净极简背景（米白/奶茶色），自然光柔光箱打光，35mm镜头人像比例，构图留白，服装材质细节突出，氛围高级感',
+      '咖啡|咖啡店|拿铁|美式|探店': '精品咖啡馆一角，拉花拿铁特写，拿铁在杯沿蒸汽缭绕，木质桌面有散落咖啡豆，午后窗光斜射，电影感暖色调，浅景深虚化，复古胶片质感',
+      '健身|瑜伽|塑形|运动': '明亮通透健身空间，浅木地板+落地窗，柔和自然光，{style}运动场景，简约ins风构图，浅灰色调，肌肉线条清晰，氛围高级',
+      '护肤|美妆|化妆|口红|面膜': '少女心化妆品平铺摄影（flatlay），浅粉色亚克力背景，柔光柔和阴影，俯拍构图，产品瓶身反光精致，散落花瓣/缎带装饰，杂志广告质感',
+      '旅行|vlog|城市|风景|打卡': '电影级旅行大片，广角构图，{mood}光线（黄昏/晨光/黄金时刻），人物剪影或背影入镜，画面留白，复古滤镜调色，Kinfolk风格',
+      '读书|学习|笔记|书桌': '整洁书桌一角，打开的精装书搭配手写笔记本+钢笔+手冲咖啡，暖黄色阅读灯，柔和阴影，俯拍构图，慢生活氛围，日系治愈风',
+      '居家|家居|好物|家具|收纳': '治愈系居家空间，奶油色软装，大面积留白，午后柔光+自然光，{style}风格摆件（马克杯/绿植/画框），浅景深虚化，暖色调调性',
+      '减脂|轻食|沙拉|健康餐|低卡': '健康餐色彩丰富的沙拉碗/轻食盘，白色大餐盘居中，俯拍平面构图，食材新鲜颜色饱和（牛油果/鸡蛋/西红柿/鸡胸肉），干净明亮白色桌面',
+      '宠物|猫|狗|萌宠': '萌宠生活写真，{style}场景（窗边/毛毯上），眼神灵动大特写，暖色调家居背景虚化，柔和自然光，温馨治愈氛围，高清毛发细节',
+      '母婴|宝宝|育儿|孕': '温柔母婴生活场景，浅粉/浅蓝奶油色调，柔光自然光，宝宝用品精致摆放，温馨家居背景，杂志广告质感',
+      '美食|食谱|做饭|料理': '精致家常菜摆盘摄影，{mood}主题菜肴，木质餐桌+亚麻桌布+复古餐具，俯拍45度构图，侧光突出食物质感，暖黄色调，油光水光细节'
+    },
+
+    // 风格/情绪词池
+    moods: ['温暖治愈', '慵懒惬意', '清新少女', '精致高级', '日系小清新', '美式复古', '法式优雅', '北欧极简'],
+    styles: ['韩系奶油', '美拉德', '法式复古', '日系森系', 'Old Money', 'Y2K', 'Quiet Luxury', 'Clean Girl'],
+
+    // 话题标签（按领域）
+    tagMap: {
+      '早餐|早饭': ['#早餐食谱', '#快手早餐', '#元气早餐', '#周末早餐', '#ins风早餐', '#早餐仪式感'],
+      '穿搭|OOTD|时尚': ['#今日穿搭', '#OOTD', '#穿搭分享', '#时尚博主', '#通勤穿搭', '#氛围感穿搭'],
+      '咖啡|探店': ['#咖啡探店', '#城市漫游', '#咖啡日记', '#周末去哪儿', '#探店日记', '#咖啡馆'],
+      '健身|塑形|瑜伽|运动': ['#健身打卡', '#塑形日记', '#瑜伽日常', '#自律生活', '#运动日常', '#健身女孩'],
+      '护肤|美妆|化妆': ['#护肤心得', '#美妆分享', '#护肤日记', '#好物推荐', '#护肤干货', '#抗老护肤'],
+      '旅行|vlog': ['#旅行日记', '#旅行vlog', '#城市漫游', '#周末去哪儿', '#旅行推荐', '#小众景点'],
+      '读书|学习': ['#读书笔记', '#好书推荐', '#学习日常', '#自我提升', '#知识分享', '#阅读日记'],
+      '居家|家居|好物': ['#居家好物', '#家居分享', '#好物推荐', '#生活方式', '#治愈日常', '#家居灵感'],
+      '减脂|轻食|健康': ['#减脂餐', '#健康饮食', '#轻食日常', '#减肥日记', '#低卡美食', '#健康生活'],
+      '宠物|猫|狗': ['#宠物日常', '#猫咪日记', '#狗狗日常', '#萌宠分享', '#铲屎官', '#治愈日常'],
+      '母婴|育儿|宝宝': ['#母婴分享', '#育儿日常', '#宝宝辅食', '#新手妈妈', '#育儿干货'],
+      '美食|料理|做饭': ['#家常菜', '#美食分享', '#食谱推荐', '#厨房日常', '#手残党福利']
+    },
+    defaultTags: ['#生活分享', '#日常记录', '#好物推荐', '#小红书', '#种草笔记']
+  };
+
+  function randPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function emoji(kind) {
+    const pool = COPY_ENGINE.emojiMap[kind] || ['✨'];
+    return randPick(pool);
+  }
+
+  // 根据主题匹配关键词，返回对应配置
+  function matchByKeyword(topic, map, fallback) {
+    for (const k of Object.keys(map)) {
+      const regex = new RegExp(k);
+      if (regex.test(topic)) return map[k];
+    }
+    return fallback;
+  }
+
+  // 生成图片 prompt（智能填充 mood/style）
+  function generateImagePrompt(topic) {
+    const tpl = matchByKeyword(topic, COPY_ENGINE.imagePromptPatterns,
+      `小红书爆款摄影风格，${topic}相关画面，{mood}氛围，{style}风格，柔和自然光，浅景深，高清杂志质感`);
+    const mood = randPick(COPY_ENGINE.moods);
+    const style = randPick(COPY_ENGINE.styles);
+    return tpl.replace('{mood}', mood).replace('{style}', style).replace('{topic}', topic);
+  }
+
+  // 生成话题标签
+  function generateTags(topic) {
+    const tags = matchByKeyword(topic, COPY_ENGINE.tagMap, COPY_ENGINE.defaultTags);
+    // 随机打乱取 5 个
+    return [...tags].sort(() => Math.random() - 0.5).slice(0, 5).join(' ');
+  }
+
+  // 生成一套完整文案
+  function generateOne(topic) {
+    const title = randPick(COPY_ENGINE.titlePatterns)(topic);
+    const subtitle = randPick(COPY_ENGINE.subtitlePatterns)(topic);
+    const pretitle = randPick(COPY_ENGINE.preTitles);
+    const imagePrompt = generateImagePrompt(topic);
+    const tags = generateTags(topic);
+    return { title, subtitle, pretitle, imagePrompt, tags };
+  }
+
+  // 生成 5 个候选（去重）
+  function generateCandidates(topic) {
+    const set = new Set();
+    const list = [];
+    let tries = 0;
+    while (list.length < 5 && tries < 40) {
+      const one = generateOne(topic);
+      if (!set.has(one.title)) { set.add(one.title); list.push(one); }
+      tries++;
+    }
+    return list;
+  }
+
+  /* ============================================================
+   * 渲染与交互
+   * ============================================================ */
+  function $(sel) { return document.querySelector(sel); }
+
+  function render() {
+    const card = $('#card');
+    const tpl = state.template;
+    const color = state.color;
+    const title = $('#f-title').value || '点击编辑标题';
+    const content = $('#f-content').value || '';
+    const pre = $('#f-pretitle').value || '';
+    const img = state.imageUrl || PLACEHOLDER;
+
+    card.className = 'card tpl-' + tpl;
+    card.style.setProperty('--accent', color);
+
+    let html = '';
+    switch (tpl) {
+      case 'cover':
+        html = `
+          <div class="bg" style="background-image:url('${img}')"></div>
+          <div class="text-area">
+            <div class="title">${escapeHtml(title)}</div>
+            <div class="subtitle">${escapeHtml(content).replace(/\n/g, ' · ')}</div>
+          </div>`;
+        break;
+      case 'bigword': {
+        // 大字报：自动把标题最后一个短语加高亮
+        const parts = title.split(/[\s，,：:｜|]/).filter(Boolean);
+        const tail = parts.pop() || title;
+        const head = parts.join(' ');
+        html = `
+          <div class="title">${escapeHtml(head)}${head ? '<br/>' : ''}<span class="highlight" style="background:${color}">${escapeHtml(tail)}</span></div>
+          <div class="content">${escapeHtml(content).replace(/\n/g, '<br/>')}</div>
+          <div class="img" style="background-image:url('${img}')"></div>`;
+        break;
+      }
+      case 'split':
+        html = `
+          <div class="img" style="background-image:url('${img}')"></div>
+          <div class="text-area">
+            <div class="title">${escapeHtml(title)}</div>
+            <div class="content">${escapeHtml(content).replace(/\n/g, '<br/>')}</div>
+          </div>`;
+        break;
+      case 'polaroid':
+        html = `
+          <div class="img" style="background-image:url('${img}')"></div>
+          <div class="title">${escapeHtml(title)}</div>
+          <div class="content">${escapeHtml(content).replace(/\n/g, ' · ')}</div>`;
+        break;
+      case 'tag':
+        html = `
+          ${pre ? `<div class="pre-title" style="background:${color}">${escapeHtml(pre)}</div>` : ''}
+          <div class="title">${escapeHtml(title)}</div>
+          <div class="desc">${escapeHtml(content).replace(/\n/g, '<br/>')}</div>
+          <div class="img" style="background-image:url('${img}')"></div>`;
+        break;
+      case 'list': {
+        const items = content.split('\n').filter(Boolean);
+        html = `
+          <div class="title">${escapeHtml(title)}</div>
+          <div class="items">
+            ${items.map((it, i) => `
+              <div class="item">
+                <div class="num" style="background:${color}">${i+1}</div>
+                <div class="item-text">${escapeHtml(it)}</div>
+              </div>`).join('')}
+          </div>`;
+        break;
+      }
+    }
+    card.innerHTML = html;
+
+    // 标签行
+    const tags = $('#f-tags').value.split(/\s+/).filter(t => t.startsWith('#'));
+    $('#tags-display').innerHTML = tags.map(t => `<span class="tag-item">${escapeHtml(t)}</span>`).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function setStatus(msg, type) {
+    const el = $('#status');
+    el.textContent = msg;
+    el.className = 'status show ' + type;
+    if (type === 'ok') setTimeout(() => el.classList.remove('show'), 3000);
+  }
+
+  // ========== ✨ 一句话生成 ==========
+  // 场景快捷点击
+  document.querySelectorAll('.scene-chip').forEach(el => {
+    el.addEventListener('click', () => {
+      $('#m-topic').value = el.dataset.topic;
+      $('#gen-copy-btn').click();
+    });
+  });
+
+  // 生成候选方案（5套本地 + 2套AI）
+  $('#gen-copy-btn').addEventListener('click', async () => {
+    const topic = $('#m-topic').value.trim();
+    if (!topic) { alert('请先输入一个主题'); return; }
+    const btn = $('#gen-copy-btn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ 生成中...（本地 5 套 + AI 2 套）';
+    const status = setStatus('正在生成文案...', 'ok');
+
+    try {
+      // 1. 本地生成 5 套（同步，快速）
+      const localCandidates = generateCandidates(topic);
+      let aiCandidates = [];
+      let aiError = null;
+      
+      // 2. AI 生成 2 套（异步，可能失败）
+      try {
+        const resp = await fetch('/api/gen-copy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic })
+        });
+        const data = await resp.json();
+        if (resp.ok && data.copies && Array.isArray(data.copies)) {
+          aiCandidates = data.copies.slice(0, 2);
+          // 给 AI 生成的文案打上标记
+          aiCandidates.forEach(c => { c.ai = true; });
+        } else {
+          aiError = data.error || 'AI 文案生成失败';
+        }
+      } catch (e) {
+        aiError = e.message;
+      }
+
+      // 3. 合并（AI在前，本地在后）
+      const allCandidates = [...aiCandidates, ...localCandidates];
+      const box = $('#candidates');
+      box.classList.add('show');
+      box.innerHTML = allCandidates.map((c, i) => `
+        <div class="candidate" data-idx="${i}" ${c.ai ? 'style="border-left:4px solid #ff6b6b"' : ''}>
+          <div class="c-title">${escapeHtml(c.title)} ${c.ai ? '🤖' : ''}</div>
+          <div class="c-sub">${escapeHtml(c.subtitle.replace(/\n/g, ' · '))}</div>
+          <div class="c-use">👉 点击使用这一套${c.ai ? '（AI 生成）' : ''}</div>
+        </div>
+      `).join('');
+      // 把数据存起来
+      box._candidates = allCandidates;
+      // 绑定点击
+      box.querySelectorAll('.candidate').forEach(el => {
+        el.addEventListener('click', () => {
+          const c = box._candidates[el.dataset.idx];
+          $('#f-title').value = c.title;
+          $('#f-content').value = c.subtitle;
+          $('#f-pretitle').value = c.pretitle;
+          $('#f-prompt').value = c.imagePrompt;
+          $('#f-tags').value = c.tags;
+          render();
+          setStatus('✅ 已填入文案！可直接点"AI 生成配图"完成整张笔记', 'ok');
+          // 滚动到预览
+          $('#card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      });
+
+      // 4. 提示结果
+      let msg = `✅ 生成完成：${localCandidates.length} 套本地 + ${aiCandidates.length} 套 AI`;
+      if (aiError) {
+        msg += `（AI 部分失败：${aiError}）`;
+        setStatus(msg, 'err');
+      } else {
+        setStatus(msg, 'ok');
+      }
+    } catch (e) {
+      setStatus('❌ 生成失败：' + e.message, 'err');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
+
+  // 折叠展开
+  document.querySelectorAll('.collapse-head').forEach(h => {
+    h.addEventListener('click', () => {
+      h.classList.toggle('collapsed');
+      document.getElementById(h.dataset.target).classList.toggle('hide');
+    });
+  });
+
+  // 模板切换
+  document.querySelectorAll('.tpl').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.tpl').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+      state.template = el.dataset.tpl;
+      render();
+    });
+  });
+
+  // 配色切换
+  document.querySelectorAll('.color').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.color').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+      state.color = el.dataset.color;
+      render();
+    });
+  });
+
+  // 风格选择器
+  let selectedStyle = '<photography>';
+  document.querySelectorAll('.style-btn').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.style-btn').forEach(x => {
+        x.classList.remove('active');
+        x.style.borderColor = '#ddd';
+        x.style.background = '#fff';
+      });
+      el.classList.add('active');
+      el.style.borderColor = '#333';
+      el.style.background = '#f0f9ff';
+      selectedStyle = el.dataset.style;
+    });
+  });
+
+  // 文字实时更新
+  ['f-title', 'f-content', 'f-pretitle', 'f-tags'].forEach(id => {
+    $('#' + id).addEventListener('input', render);
+  });
+
+  // AI 生成配图（异步任务 + 轮询，避免预览器超时）
+  async function submitImageJob(prompt, style) {
+    const resp = await fetch('/api/gen-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, style })
+    });
+    if (!resp.ok) throw new Error('提交任务失败 HTTP ' + resp.status);
+    return resp.json();
+  }
+  async function pollJob(jobId) {
+    const resp = await fetch('/api/job/' + jobId);
+    if (!resp.ok) throw new Error('查询失败 HTTP ' + resp.status);
+    return resp.json();
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // 全局任务标志
+  let genCancelled = false;
+  let currentJobId = null;
+
+  $('#cancel-btn').addEventListener('click', async () => {
+    genCancelled = true;
+    try {
+      const resp = await fetch('/api/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}) // 不传 job_id = 清空所有
+      });
+      const data = await resp.json();
+      setStatus(`✅ 已清空 ${data.count} 个任务，限流已释放`, 'ok');
+    } catch (e) {
+      setStatus('取消失败：' + e.message, 'err');
+    }
+    $('#gen-btn').disabled = false;
+    $('#gen-btn').textContent = '🎨 AI 生成配图';
+    $('#cancel-btn').style.display = 'none';
+    const imgEl = document.querySelector('#card .img, #card .bg');
+    if (imgEl) imgEl.classList.remove('loading');
+  });
+
+  $('#gen-btn').addEventListener('click', async () => {
+    const userPrompt = $('#f-prompt').value.trim();
+    if (!userPrompt) { setStatus('请先填写图片描述', 'err'); return; }
+    const btn = $('#gen-btn');
+    const cancelBtn = $('#cancel-btn');
+    btn.disabled = true;
+    cancelBtn.style.display = 'block';
+    genCancelled = false;
+
+    const imgEl = document.querySelector('#card .img, #card .bg');
+    if (imgEl) imgEl.classList.add('loading');
+
+    const fullPrompt = `小红书风格，精致明亮，高清摄影感，${userPrompt}`;
+    const MAX_RETRY = 3;
+    const RETRY_WAIT = 25;
+    const POLL_INTERVAL = 3000;
+    const POLL_MAX_TIME = 180_000; // 3分钟
+
+    try {
+      for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
+        if (genCancelled) return;
+        btn.textContent = attempt === 1
+          ? '📤 提交任务中...'
+          : `⏳ 重试中 (${attempt}/${MAX_RETRY})...`;
+        setStatus(attempt === 1 ? '正在提交生成任务...' : `第 ${attempt} 次尝试...`, 'ok');
+
+        // 1) 提交任务
+        const { job_id, error: submitErr } = await submitImageJob(fullPrompt, selectedStyle);
+        if (submitErr) throw new Error(submitErr);
+        if (!job_id) throw new Error('未获得 job_id');
+        currentJobId = job_id;
+
+        // 2) 轮询任务状态
+        const startTime = Date.now();
+        let job = null;
+        while (Date.now() - startTime < POLL_MAX_TIME) {
+          if (genCancelled) return;
+          await sleep(POLL_INTERVAL);
+          if (genCancelled) return;
+          job = await pollJob(job_id);
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          btn.textContent = `⏳ 生成中... ${elapsed}s`;
+          setStatus(`🎨 AI 正在生成图片... 已用时 ${elapsed}s（通常 15-60s）`, 'ok');
+          if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') break;
+        }
+
+        if (genCancelled) return;
+        if (!job || (job.status !== 'done' && job.status !== 'error')) {
+          throw new Error('查询超时（3分钟）');
+        }
+
+        // 3) 处理结果
+        if (job.status === 'error') {
+          if (job.rateLimited && attempt < MAX_RETRY) {
+            for (let s = RETRY_WAIT; s > 0; s--) {
+              if (genCancelled) return;
+              btn.textContent = `⏱ 排队中... ${s}s 后重试`;
+              setStatus(`⚠️ 限流：同账号同时只能跑 1 个图片任务，${s}s 后自动重试 (${attempt}/${MAX_RETRY-1})`, 'err');
+              await sleep(1000);
+            }
+            continue;
+          }
+          throw new Error((job.error || '生成失败') + '：' + (job.message || ''));
+        }
+
+        // 成功
+        const data = job.result || {};
+        const pickUrl = (v) => Array.isArray(v) ? v[0] : v;
+        const url = pickUrl(data.result_url) || pickUrl(data.url) || pickUrl(data.image_url) ||
+                    (data.result && pickUrl(data.result.url)) ||
+                    (data.data && pickUrl(data.data.url)) ||
+                    (Array.isArray(data.images) && data.images[0]);
+        if (!url) throw new Error('返回中未找到图片URL: ' + JSON.stringify(data).slice(0, 200));
+
+        state.imageUrl = url;
+        render();
+        setStatus('✅ 配图生成成功！', 'ok');
+        return;
+      }
+    } catch (e) {
+      setStatus('❌ 生成失败：' + e.message, 'err');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🎨 AI 生成配图';
+      cancelBtn.style.display = 'none';
+      if (imgEl) imgEl.classList.remove('loading');
+    }
+  });
+
+  // 导出 PNG
+  $('#export-btn').addEventListener('click', async () => {
+    setStatus('正在导出...', 'ok');
+    try {
+      const canvas = await html2canvas($('#card'), { scale: 2, useCORS: true, allowTaint: true, backgroundColor: null });
+      const link = document.createElement('a');
+      link.download = `小红书_${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      setStatus('✅ 已导出', 'ok');
+    } catch (e) {
+      setStatus('导出失败：' + e.message, 'err');
+    }
+  });
+
+  // 复制文案
+  $('#copy-text-btn').addEventListener('click', () => {
+    const text = `${$('#f-title').value}\n\n${$('#f-content').value}\n\n${$('#f-tags').value}`;
+    navigator.clipboard.writeText(text).then(() => setStatus('✅ 文案已复制到剪贴板', 'ok'));
+  });
+
+  // 初始渲染
+  render();
+
+  // 🔧 诊断按钮：测试后端连通性
+  $('#diag-btn').addEventListener('click', async () => {
+    const log = [];
+    log.push('📍 当前页面地址：' + location.href);
+    log.push('📍 API 基地址：' + location.origin);
+
+    try {
+      log.push('\n[1/2] 测试 GET /（首页）...');
+      const r1 = await fetch('/');
+      log.push(`  ✅ HTTP ${r1.status}`);
+    } catch (e) {
+      log.push('  ❌ ' + e.message);
+    }
+
+    try {
+      log.push('\n[2/2] 测试 POST /api/gen-image（提交任务）...');
+      const r2 = await fetch('/api/gen-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: '测试图片' })
+      });
+      const text = await r2.text();
+      log.push(`  ✅ HTTP ${r2.status}`);
+      log.push('  响应：' + text.slice(0, 200));
+    } catch (e) {
+      log.push('  ❌ ' + e.message);
+      log.push('  ⚠️ 这个错误说明浏览器无法连到后端');
+      log.push('  可能原因：');
+      log.push('    1. 预览地址不是 http://localhost:7788');
+      log.push('    2. 服务被意外关闭');
+      log.push('    3. CORS 或端口被防火墙拦截');
+    }
+
+    alert(log.join('\n'));
+    console.log(log.join('\n'));
+  });
+</script>
+</body>
+</html>
